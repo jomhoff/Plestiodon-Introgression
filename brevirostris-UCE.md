@@ -8,9 +8,8 @@ This pipeline is the workflow used to estimate reticulation in the _Plestiodon b
 
 The first step in this project is to take the aligned UCE data and use [IQ-TREE](https://github.com/iqtree/iqtree2) to infer unrooted gene trees for each of the 3,282 UCEs
 ```
+
 ```
-
-
 
 ## **Infer Species Tree with ASTRALIII**
 
@@ -18,3 +17,8 @@ Now that we have gene trees from IQtree2, we can use [ASTRALIII](https://github.
 ```
 
 ```
+
+## **Visualize Gene Tree Discordance**
+
+
+## **Estimate Introgression with QuIBL**
