@@ -318,7 +318,7 @@ Now that we have gene trees from IQtree2, we can use [ASTRALIII](https://github.
 ```
 java -jar /Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/Astral/astral.5.7.8.jar -i /Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/Brevirostris_Project/IQTREE_results/Gene-Trees1KB/loci.treefile -o sp.tre
 ```
-## **Rooting and Pruning Trees
+## **Rooting and Pruning Trees**
 
 In order to compleate further analyses, we must root the trees to the outgroup and prune them to have only one individual per species
 ```
@@ -388,3 +388,249 @@ Gray: Have no support for conflicting bipartion
 
 
 ## **Estimate Introgression with QuIBL**
+
+Now we are going to estimate the directionality and degree of reticulation using [QuIBL](https://github.com/miriammiyagi/QuIBL) which "is a program for detecting introgressed loci and characterizing introgression events in a species network. It takes a set of gene trees as input and estimates the proportion of introgressed loci as well as the timing of an introgression pulse triplet by triplet"
+
+In order to run QuIBL, we first need to download the QuIBL.py and quible_requirements.txt files from the github. Then, we make sure the dependencies are installed:
+```
+pip install -r quibl_requirements.txt
+```
+
+Then we have to make an input file:
+```
+[Input]
+treefile: ./340sgt_r1kb.tre
+numdistributions: 2
+likelihoodthresh: 0.01
+numsteps: 50
+gradascentscalar: 0.5
+totaloutgroup: mxh44_out
+multiproc: True
+maxcores:40
+
+
+[Output]
+OutputPath: ./340pgt_r1kb_out.csv
+```
+
+Finally we can run QuIBL:
+```
+#!/bin/sh
+#SBATCH --job-name brev_quibl
+#SBATCH --nodes=1
+#SBATCH --mem=50gb
+#SBATCH --time=500:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --tasks-per-node=40
+#SBATCH --mail-user=jhoffman1@amnh.org
+#SBATCH --output=slurm-%j-%x.out
+
+export OMP_NUM_THREADS=$SLURM_NTASKS_PER_NODE
+
+source ~/.bash_profile
+conda activate quibl
+python QuIBL.py ./brev_inputfile.txt
+```
+
+To view the outcome, we use QuIBLR
+```
+#devtools::install_github("nbedelman/quiblR")
+library("quiblR")
+library("ggplot2")
+library("ape")
+library("hash")
+library("ggtree")
+library("ggpubr")
+library("dplyr")
+library("phytools")
+setwd("/Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/Brevirostris_Project/QuIBL")
+
+speciesTree <-  read_speciesTree("340psp_r1kb.tre")
+quiblOutput <- read_csv_quibl("340pgt_r1kb_out.csv")
+originalTrees <- read.tree("340pgt_r1kb.tre")
+speciesTree <- as.phylo(speciesTree)
+
+
+#edit names##########
+uni_under <- unique(quiblOutput$outgroup)
+uni_dash <- gsub("_","-",uni_under)
+for(u in 1:length(uni_under)){
+  quiblOutput$triplet <-  gsub(uni_under[u],uni_dash[u],quiblOutput$triplet)
+  quiblOutput$outgroup <-  gsub(uni_under[u],uni_dash[u],quiblOutput$outgroup)
+}
+
+
+plot(speciesTree)
+
+totalTrees <- sum(quiblOutput$count)/length(unique(quiblOutput$triplet))
+
+
+
+#if you get an error, make sure you have replaces _ with - in species tree
+quiblOutput <- mutate(quiblOutput,
+               isDiscordant = as.integer(! apply(quiblOutput, 1, isSpeciesTree, sTree= 
+              speciesTree)), isSignificant = as.integer(apply(quiblOutput, 1, testSignificance, threshold=10)), totalIntrogressionFraction=(mixprop2*count*isDiscordant)/totalTrees)
+
+
+#head(largeQuiblOutput)
+
+introgressionSummary <- getIntrogressionSummary(quiblOut = quiblOutput, speciesTree = speciesTree)
+
+
+
+
+#make heat map
+summaryMatrix <- ggplot(data = introgressionSummary, aes(tax1, tax2, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "white", high = "red", mid = "yellow",na.value = "grey50",
+                       midpoint = max(introgressionSummary$value)/2, limit = c(0,max(introgressionSummary$value)),
+                       name="Average introgression fraction") +
+  geom_abline(slope = 1, intercept=0)+
+  geom_vline(xintercept=seq(1.5,nrow(introgressionSummary)+0.5,1), alpha=0.6)+
+  geom_hline(yintercept=seq(1.5,nrow(introgressionSummary)+0.5,1), alpha=0.6)+
+  labs(x="", y="")+
+  #scale_x_discrete(position = "top") +
+  theme(panel.grid = element_blank(),legend.position = "none")
+
+
+
+#SummaryMatrix
+
+speciesTreeSubset <- ggtree(extractTripletTree(speciesTree, unique(introgressionSummary$tax1)))
+
+speciesTreeSubset_down <- ggtree(extractTripletTree(speciesTree, unique(introgressionSummary$tax1)))+ coord_flip()
+
+#speciesTreeSubset
+
+ggarrange(  speciesTreeSubset, summaryMatrix,NULL, speciesTreeSubset_down,
+            ncol = 2,nrow=2, heights=c(2,1), widths=c(1,2), align="hv",common.legend = TRUE)
+```
+
+The resulting heatmap looks like this:
+![QuIBLHeatmap](QuIBLHeatmap.png)
+
+## **SnaQ**
+
+Now we will use [SnaQ](https://solislemuslab.github.io/snaq-tutorial/) to hypothesize phylogenetic relations in a while accouting for gene-flow
+
+First, we must create a quartet file to input to SnaQ
+```
+#Written by: Dylan DeBaun
+	#alterated by: Jon Hoffman
+
+#Can create quartet files for SnaQ
+#load libraries
+ library('MSCquartets')
+ library('ape')
+ library('gtools')
+ library('stringr')
+ setwd("/Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/Brevirostris_Project/SnaQ/")
+ #load species treesearch/Phylo/SnaQ/Brev96/")
+ snake_tree <-read.tree("340psp_r1kb.tre")
+ 
+ #load gene trees
+ genedata_ind = "340pgt_r1kb.tre"
+ gtrees_ind <- read.tree(genedata_ind)
+ 
+ #INPUTS
+ species = read.delim("brev_species.txt", header  = F) #list of species, with the last species being the outgroup species
+ outgroup = species$V1[15]r  = F) #list of species, with the last species being the outgroup species
+ indivs <- read.delim("brev_individuals.txt",header  = F) #list of species, with the last species being the outgroup species
+ indivs <- indivs$V1ader  = F) #list of species, with the last species being the outgroup species
+ group = "brev340" #prefix for the clade
+ 
+ #Create the quartet file for SnaQ
+ b <- quartetTable(gtrees_ind,taxonnames=indivs,random = 0) #make quartet table at individual level
+ x <- b[rowSums(b) !=4, colSums(b) !=0] #edit it to look the way we want for snaq,random = 0) #make quartet table at individual level
+ y<- matrix(rep(0,dim(x)[1]*8),ncol = 8,nrow=dim(x)[1])
+ colnames(y)<-c("t1","t2","t3","t4","CF12_34","CF13_24","CF14_23","ngenes")m(x)[1])
+ for(i in 1:dim(x)[1]){CF13_24","CF14_23","ngenes")
+   count=0
+   for(j in 1:dim(x)[2]){
+     if(x[i,j] == 1){
+       count = count+1
+       y[i,count] = colnames(x)[j]
+     }
+   }
+   y[i,"ngenes"] = x[i,dim(x)[2]-2] + x[i,dim(x)[2]-1]+x[i,dim(x)[2]]
+   y[i,"CF12_34"] = as.numeric(x[i,dim(x)[2]-2])/as.numeric(y[i,"ngenes"]))[2]-1]+x[i,dim(x)[2]]
+   y[i,"CF13_24"] = as.numeric(x[i,dim(x)[2]-1])/as.numeric(y[i,"ngenes"]))/as.numeric(y[i,"ngenes"])
+   y[i,"CF14_23"] = as.numeric(x[i,dim(x)[2]])/as.numeric(y[i,"ngenes"]))/as.numeric(y[i,"ngenes"])
+ }as.numeric(y[i,"ngenes"])
+write.csv(y, paste0(group,"_individualsCFs.csv"), row.names = F)
+```
+
+Now we must create a julia script to run SnaQ
+```
+#written by Dylan DeBaun
+using PhyloNetworks, CSV, DataFrames
+
+group = "brev340" # outfile prefix, also the name of the directory with all the input files
+numretic = 3 #number of hybridizations to look for
+
+print(group);
+print(numretic);
+
+cd(group);
+
+#read in the tree, mapping, and indiv level concordance factor file (made in prep.R)
+astraltree=readTopology(string(group,".tre"));
+cf = string(group,"_individualsCFs.csv");
+mappingFile = string(group,"_map.csv");
+
+#make a species level cf file, write to folder
+df_sp = mapAllelesCFtable(mappingFile, cf);
+d_sp = readTableCF!(df_sp);
+df_sp = writeTableCF(d_sp);
+CSV.write(string(group,"CFtable_species.csv"),df_sp)
+
+#run snaq
+x=parse(Int64, numretic)
+net = snaq!(astraltree,d_sp, hmax=x, filename=string("net",numretic,group), seed=2345);
+```
+I created a .jl file for each of the number of reticulation events to look for (1-5)
+
+Run SnaQ
+```
+#!/bin/sh
+#SBATCH --job-name brev_snaq
+#SBATCH --nodes=1
+#SBATCH --mem=50gb
+#SBATCH --time=500:00:00
+#SBATCH --mail-type=ALL
+#SBATCH --tasks-per-node=40
+#SBATCH --mail-user=jhoffman1@amnh.org
+#SBATCH --output=slurm-%j-%x.out
+
+source ~/.bash_profile
+julia runsnaq.jl
+```
+
+To visualize the output from each SnaQ run, we use the following code in Julia
+```
+using PhyloNetworks
+using PhyloPlots
+brev = readMultiTopology("net2brev96.networks")
+brev = brev[1] #select the network with the lowest psuedo-likelihood
+rootatnode!(brev, "P.tetragrammus")
+plot(brev, :R, showGamma=true)
+```
+
+The network should look like this:
+![SnaQ Network](net2brev340_best.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
