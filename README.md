@@ -7,4 +7,4 @@ This page is an outline of the methodology I used to take UCE data and make it m
 Check out the workflow [here](https://github.com/jomhoff/UCEs-and-Introgression/blob/main/brevirostris-UCE.md)
 
 
-![Plestiodon lotus](Plestiodon_lotus.jpeg)
+                                                    ![Plestiodon lotus](Plestiodon_lotus.jpeg)
