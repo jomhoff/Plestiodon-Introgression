@@ -6,7 +6,7 @@ This pipeline is the workflow used to estimate reticulation in the _Plestiodon b
 
 To do so, we will be mapping the UCEs to a chromosome-level reference genome and then concatenating UCEs that are within 200,000bps of eachother to approximate 'cogenic' UCEs. Then, we will take the 'psuedo-genes' and continue the analysis with those larger than 1,000bps. With this concatenation scheme we are creating more informative partitions that attempt to be biologically relevant.
 
-## **Data Preperation**
+## **Data Preparation**
 
 In order to map UCEs on concatenated plestiodonUCE.txt file in the supplementary data of Bryson Jr. et al 2017 needs to be split into each of the 59 individuals
 ```
@@ -113,7 +113,7 @@ lapply(dog, rename)
 
 Now we're ready to blast!
 
-## **Blasting UCEs against closest chromosome-level reference genome _Tiliqua scincoides_**
+## **Blasting UCEs Against Closest Chromosome-level Reference Genome _Tiliqua scincoides_**
 
 First we need to install blast with Homebrew (we're using MacOs)
 ```
@@ -133,6 +133,9 @@ do
 	blastn -db tiliqua -query final_UCE_fastas/${i}_final.fas -out blast_output_tiliqua/UCE_${i}.txt -strand plus -outfmt 6
 done
 ```
+The -outfmt 6 specification gives us blast results with the following headers:
+![output headers]()
+
 
 Now we sort the blast results to isolate the best hit for each UCE
 ```
@@ -156,7 +159,7 @@ datafr <- do.call("rbind", datalist)
 
 write.csv(datafr, file = "all_UCE_blast.csv", row.names = FALSE)
 ```
-## **Creating psuedo-genes**
+## **Creating Psuedo-Genes**
 
 
 
