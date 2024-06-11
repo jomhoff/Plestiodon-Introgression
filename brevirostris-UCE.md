@@ -307,7 +307,7 @@ OK, cool! Now we're all set to infer gene trees, a species tree, and introgressi
 
 ## **Infer Gene Trees with IQ-TREE**
 
-The first step in this project is to take the aligned UCE data and use [IQ-TREE](https://github.com/iqtree/iqtree2) to infer unrooted gene trees for each of the 3,282 UCEs
+The first step in this project is to take the aligned UCE data and use [IQ-TREE](https://github.com/iqtree/iqtree2) to infer unrooted gene trees for each of the pseudo-genes
 ```
 /Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/iqtree/bin/iqtree2 -S /Users/jonhoff/Documents/AMNH/Thesis_Research/Phylo/Brevirostris_Project/FINAL_GENES_OVER1kb --prefix loci -T AUTO
 ```
