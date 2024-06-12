@@ -536,7 +536,7 @@ First, we must create a quartet file to input to SnaQ
  species = read.delim("brev_species.txt", header  = F) #list of species, with the last species being the outgroup species
  outgroup = species$V1[15]r  = F) #list of species, with the last species being the outgroup species
  indivs <- read.delim("brev_individuals.txt",header  = F) #list of species, with the last species being the outgroup species
- indivs <- indivs$V1ader  = F) #list of species, with the last species being the outgroup species
+ indivs <- indivs$V1 #list of species, with the last species being the outgroup species
  group = "brev340" #prefix for the clade
  
  #Create the quartet file for SnaQ
